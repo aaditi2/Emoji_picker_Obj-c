@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 #import "HeaderView.h"
+#import "EmojiSearchManager.h"
 #import <QuartzCore/QuartzCore.h>
 
 @interface AppDelegate () <NSCollectionViewDataSource, NSCollectionViewDelegate>
@@ -9,7 +10,10 @@
 @property (strong, nonatomic) NSCollectionView *collectionView;
 
 @property (strong, nonatomic) NSMutableArray *recents;
-@property (strong, nonatomic) NSArray *emojis;
+
+@property (strong) NSDictionary *emojiKeywords;
+@property (strong) NSArray *filteredEmojis;
+@property (strong) EmojiSearchManager *searchManager;
 
 @end
 
@@ -19,7 +23,27 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     
-    self.emojis = @[@"😀",@"😂",@"🥹",@"😍",@"🔥",@"❤️",@"👍",@"🎉",@"😎",@"😭",@"😴",@"🤯",@"🍕",@"☕",@"🚀"];
+    self.searchManager = [[EmojiSearchManager alloc] init];
+
+    self.emojiKeywords = @{
+        @"😀": @[@"smile", @"happy"],
+        @"😂": @[@"laugh", @"funny"],
+        @"😍": @[@"love", @"heart eyes"],
+        @"🔥": @[@"fire", @"hot"],
+        @"❤️": @[@"love", @"heart"],
+        @"👍": @[@"like", @"ok"],
+        @"🎉": @[@"party", @"celebrate"],
+        @"😎": @[@"cool"],
+        @"😭": @[@"sad", @"cry"],
+        @"😴": @[@"sleep", @"tired"],
+        @"🤯": @[@"shock"],
+        @"🍕": @[@"food", @"pizza"],
+        @"☕": @[@"coffee"],
+        @"🚀": @[@"rocket"],
+        @"🌸": @[@"Flower"]
+    };
+
+    self.filteredEmojis = self.emojiKeywords.allKeys;
 
     NSArray *saved = [[NSUserDefaults standardUserDefaults] objectForKey:@"recents"];
     self.recents = saved ? [saved mutableCopy] : [NSMutableArray array];
@@ -44,7 +68,15 @@
     [self.panel setLevel:NSFloatingWindowLevel];
     [self.panel setTitle:@"Emoji Panel"];
 
-    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 260, 360)];
+    // Search bar
+    NSSearchField *searchField = [[NSSearchField alloc] initWithFrame:NSMakeRect(10, 325, 240, 28)];
+    searchField.placeholderString = @"Search emojis";
+    searchField.target = self;
+    searchField.action = @selector(searchChanged:);
+    [self.panel.contentView addSubview:searchField];
+
+    // Scroll
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 260, 320)];
     scrollView.hasVerticalScroller = YES;
 
     self.collectionView = [[NSCollectionView alloc] initWithFrame:scrollView.bounds];
@@ -93,7 +125,7 @@
 
 - (NSInteger)collectionView:(NSCollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
     if (section == 0) return self.recents.count;
-    return self.emojis.count;
+    return self.filteredEmojis.count;
 }
 
 #pragma mark - Cells
@@ -102,12 +134,9 @@
     
     NSCollectionViewItem *item = [collectionView makeItemWithIdentifier:@"EmojiItem" forIndexPath:indexPath];
     
-    NSString *emoji;
-    if (indexPath.section == 0) {
-        emoji = self.recents[indexPath.item];
-    } else {
-        emoji = self.emojis[indexPath.item];
-    }
+    NSString *emoji = (indexPath.section == 0)
+        ? self.recents[indexPath.item]
+        : self.filteredEmojis[indexPath.item];
 
     for (NSView *subview in item.view.subviews) {
         [subview removeFromSuperview];
@@ -152,7 +181,7 @@ viewForSupplementaryElementOfKind:(NSString *)kind
 
     NSString *emoji = (indexPath.section == 0)
         ? self.recents[indexPath.item]
-        : self.emojis[indexPath.item];
+        : self.filteredEmojis[indexPath.item];
 
     [self.recents removeObject:emoji];
     [self.recents insertObject:emoji atIndex:0];
@@ -167,6 +196,18 @@ viewForSupplementaryElementOfKind:(NSString *)kind
 
     [self insertEmoji:emoji];
     [self showCopiedToast];
+}
+
+#pragma mark - Search
+
+- (void)searchChanged:(NSSearchField *)sender {
+    
+    NSString *query = sender.stringValue;
+
+    self.filteredEmojis =
+    [self.searchManager filterEmojis:self.emojiKeywords query:query];
+
+    [self.collectionView reloadData];
 }
 
 #pragma mark - Paste
@@ -190,6 +231,7 @@ viewForSupplementaryElementOfKind:(NSString *)kind
         width,
         height
     )];
+
     toast.wantsLayer = YES;
     toast.layer.backgroundColor = [[NSColor blackColor] colorWithAlphaComponent:0.85].CGColor;
     toast.layer.cornerRadius = 10;
@@ -202,7 +244,6 @@ viewForSupplementaryElementOfKind:(NSString *)kind
     label.editable = NO;
     label.selectable = NO;
     label.textColor = NSColor.whiteColor;
-    label.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
 
     label.translatesAutoresizingMaskIntoConstraints = NO;
     [toast addSubview:label];
