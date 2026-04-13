@@ -59,9 +59,10 @@
 - (void)setupPanel {
     
     self.panel = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 260, 360)
-                                            styleMask:(NSWindowStyleMaskTitled |
-                                                       NSWindowStyleMaskClosable |
-                                                       NSWindowStyleMaskResizable)
+                                             styleMask:(NSWindowStyleMaskTitled |
+                                                        NSWindowStyleMaskClosable |
+                                                        NSWindowStyleMaskMiniaturizable |
+                                                        NSWindowStyleMaskResizable)
                                               backing:NSBackingStoreBuffered
                                                 defer:NO];
 
